@@ -8,7 +8,8 @@
 #include <ctype.h>
 
 # define INTEGER    1
-# define PLUS       2    
+# define PLUS       2
+# define SUBS       3
 
 typedef struct s_token
 {
@@ -58,6 +59,12 @@ int main (int argc, char **argv)
                     token->value = atoi(&input[i]);
                     while (isdigit(input[i])) i++;
                 }
+                else if(input[i] == '-')
+                {
+                    token->type = SUBS;
+                    token->value = 0;
+                    i++;
+                }
                 else if (input[i] == '+')
                 {
                     token->type = PLUS;
@@ -89,16 +96,31 @@ int main (int argc, char **argv)
 
         int sum = 0;
         t_token *tmp = head;
+        int last_operator = PLUS; // Assume the first number is positive
+
         while (tmp)
         {
             if (tmp->type == INTEGER)
             {
+                if (last_operator == PLUS)
+                {
+                    sum += tmp->value;
+                }
+                else if (last_operator == SUBS)
+                {
+                    sum -= tmp->value;
+                }
                 printf("%d", tmp->value);
-                sum += tmp->value;
             }
             else if (tmp->type == PLUS)
             {
+                last_operator = PLUS;
                 printf("+");
+            }
+            else if (tmp->type == SUBS)
+            {
+                last_operator = SUBS;
+                printf("-");
             }
             tmp = tmp->next;
         }
