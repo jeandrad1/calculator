@@ -50,8 +50,9 @@ int main (int argc, char **argv)
                     printf("Error: memory allocation failed\n");
                     return (1);
                 }
-
-                if (isdigit(input[i]))
+                if (isspace(input[i]))
+                    i++;
+                else if (isdigit(input[i]))
                 {
                     token->type = INTEGER;
                     token->value = atoi(&input[i]);
