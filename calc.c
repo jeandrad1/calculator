@@ -12,6 +12,8 @@
 # define SUBS       3
 # define PRODUCT    4
 # define DIVIDE     5
+# define LPAREN     6
+# define RPAREN     7
 
 typedef struct s_token
 {
@@ -20,6 +22,14 @@ typedef struct s_token
     struct s_token *next;
     struct s_token *prev;
 }               t_token;
+
+typedef struct s_ast
+{
+    int type;
+    int value;
+    struct s_ast *left;
+    struct s_ast *right;
+}               t_ast;
 
 t_token *lexer(char *input)
 {
@@ -71,6 +81,18 @@ t_token *lexer(char *input)
             token->value = 0;
             i++;
         }
+        else if (input[i] == '(')
+        {
+            token->type = LPAREN;
+            token->value = 0;
+            i++;
+        }
+        else if (input[i] == ')')
+        {
+            token->type = RPAREN;
+            token->value = 0;
+            i++;
+        }
         else
         {
             printf("Syntax error\n");
@@ -93,31 +115,143 @@ t_token *lexer(char *input)
         current = token;
     }
 
-    // Validate the token sequence
-    t_token *tmp = head;
-    int expect_number = 1; // Expect a number first
-    while (tmp)
-    {
-        if (expect_number && tmp->type != INTEGER)
-        {
-            printf("Syntax error: expected a number\n");
-            return NULL;
-        }
-        if (!expect_number && tmp->type == INTEGER)
-        {
-            printf("Syntax error: expected an operator\n");
-            return NULL;
-        }
-        expect_number = !expect_number;
-        tmp = tmp->next;
-    }
-    if (expect_number == 1)
-    {
-        printf("Syntax error: expression cannot end with an operator\n");
-        return NULL;
-    }
-
     return head;
+}
+
+t_ast *create_ast_node(int type, int value, t_ast *left, t_ast *right)
+{
+    t_ast *node = (t_ast *)malloc(sizeof(t_ast));
+    if (node == NULL)
+    {
+        printf("Error: memory allocation failed\n");
+        exit(1);
+    }
+    node->type = type;
+    node->value = value;
+    node->left = left;
+    node->right = right;
+    return node;
+}
+
+t_ast *parse_expression(t_token **current);
+
+t_ast *parse_factor(t_token **current)
+{
+    t_ast *node = NULL;
+    if ((*current)->type == INTEGER)
+    {
+        node = create_ast_node(INTEGER, (*current)->value, NULL, NULL);
+        *current = (*current)->next;
+    }
+    else if ((*current)->type == LPAREN)
+    {
+        *current = (*current)->next;
+        node = parse_expression(current);
+        if ((*current)->type != RPAREN)
+        {
+            printf("Syntax error: expected ')'\n");
+            exit(1);
+        }
+        *current = (*current)->next;
+    }
+    else
+    {
+        printf("Syntax error: expected a number or '('\n");
+        exit(1);
+    }
+    return node;
+}
+
+t_ast *parse_term(t_token **current)
+{
+    t_ast *node = parse_factor(current);
+    while (*current && ((*current)->type == PRODUCT || (*current)->type == DIVIDE))
+    {
+        if ((*current)->type == PRODUCT)
+        {
+            *current = (*current)->next;
+            node = create_ast_node(PRODUCT, 0, node, parse_factor(current));
+        }
+        else if ((*current)->type == DIVIDE)
+        {
+            *current = (*current)->next;
+            node = create_ast_node(DIVIDE, 0, node, parse_factor(current));
+        }
+    }
+    return node;
+}
+
+t_ast *parse_expression(t_token **current)
+{
+    t_ast *node = parse_term(current);
+    while (*current && ((*current)->type == PLUS || (*current)->type == SUBS))
+    {
+        if ((*current)->type == PLUS)
+        {
+            *current = (*current)->next;
+            node = create_ast_node(PLUS, 0, node, parse_term(current));
+        }
+        else if ((*current)->type == SUBS)
+        {
+            *current = (*current)->next;
+            node = create_ast_node(SUBS, 0, node, parse_term(current));
+        }
+        else if ((*current)->type == PRODUCT)
+        {
+            *current = (*current)->next;
+            node = create_ast_node(PRODUCT, 0, node, parse_term(current));
+        }
+        else if ((*current)->type == DIVIDE)
+        {
+            *current = (*current)->next;
+            node = create_ast_node(DIVIDE, 0, node, parse_term(current));
+        }
+        else if ((*current)->type == RPAREN)
+        {
+            return node;
+        }
+    }
+    return node;
+}
+
+int evaluate_ast(t_ast *node)
+{
+    if (node->type == INTEGER)
+    {
+        return node->value;
+    }
+    else if (node->type == PLUS)
+    {
+        return evaluate_ast(node->left) + evaluate_ast(node->right);
+    }
+    else if (node->type == SUBS)
+    {
+        return evaluate_ast(node->left) - evaluate_ast(node->right);
+    }
+    else if (node->type == PRODUCT)
+    {
+        return evaluate_ast(node->left) * evaluate_ast(node->right);
+    }
+    else if (node->type == DIVIDE)
+    {
+        int right = evaluate_ast(node->right);
+        if (right == 0)
+        {
+            printf("Error: division by zero\n");
+            exit(1);
+        }
+        return evaluate_ast(node->left) / right;
+    }
+    return 0;
+}
+
+void free_ast(t_ast *node)
+{
+    if (node == NULL)
+        return;
+    free_ast(node->left);
+    free_ast(node->right);
+    free(node);
 }
 
 int main (int argc, char **argv)
@@ -147,59 +281,14 @@ int main (int argc, char **argv)
             continue;
         }
 
-        int result = 0;
-        t_token *tmp = head;
-        int last_operator = PLUS; // Assume the first number is positive
-
-        while (tmp)
+        current = head;
+        t_ast *ast = parse_expression(&current);
+        if (current != NULL)
         {
-            if (tmp->type == INTEGER)
-            {
-                if (last_operator == PLUS)
-                {
-                    result += tmp->value;
-                }
-                else if (last_operator == SUBS)
-                {
-                    result -= tmp->value;
-                }
-                else if (last_operator == PRODUCT)
-                {
-                    result *= tmp->value;
-                }
-                else if (last_operator == DIVIDE)
-                {
-                    if (tmp->value == 0)
-                    {
-                        printf("Error: division by zero\n");
-                        return (1);
-                    }
-                    result /= tmp->value;
-                }
-                printf("%d", tmp->value);
-            }
-            else if (tmp->type == PLUS)
-            {
-                last_operator = PLUS;
-                printf("+");
-            }
-            else if (tmp->type == SUBS)
-            {
-                last_operator = SUBS;
-                printf("-");
-            }
-            else if (tmp->type == PRODUCT)
-            {
-                last_operator = PRODUCT;
-                printf("*");
-            }
-            else if (tmp->type == DIVIDE)
-            {
-                last_operator = DIVIDE;
-                printf("/");
-            }
-            tmp = tmp->next;
+            printf("Syntax error: unexpected token\n");
+            continue;
         }
+        int result = evaluate_ast(ast);
         printf(" = %d\n", result);
 
         // Free the linked list
@@ -210,6 +299,9 @@ int main (int argc, char **argv)
             free(tmp);
         }
         current = NULL;
+
+        // Free the AST
+        free_ast(ast);
     }
     return (0);
 }
