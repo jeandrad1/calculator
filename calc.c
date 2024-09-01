@@ -158,14 +158,14 @@ t_ast *parse_expression(t_token **current) {
 
 void print_ast(t_ast *node, int level) {
     if (node == NULL) return;
-    print_ast(node->right, level + 1);
-    for (int i = 0; i < level; i++) printf("    ");
+    print_ast(node->left, level + 1); // Print left subtree first
+    for (int i = 0; i < level; i++) printf("    "); // Indentation for current level
     if (node->type == INTEGER) {
-        printf("%d\n", node->value);
+        printf("%d\n", node->value); // Print integer value
     } else {
-        printf("%c\n", node->type == PLUS ? '+' : node->type == SUBS ? '-' : node->type == PRODUCT ? '*' : '/');
+        printf("%c\n", node->type == PLUS ? '+' : node->type == SUBS ? '-' : node->type == PRODUCT ? '*' : '/'); // Print operator
     }
-    print_ast(node->left, level + 1);
+    print_ast(node->right, level + 1); // Print right subtree
 }
 
 int evaluate_ast(t_ast *node) {
