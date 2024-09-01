@@ -156,16 +156,33 @@ t_ast *parse_expression(t_token **current) {
     return node;
 }
 
-void print_ast(t_ast *node, int level) {
+void print_ast(t_ast *node, int indent, int is_left) {
     if (node == NULL) return;
-    print_ast(node->left, level + 1); // Print left subtree first
-    for (int i = 0; i < level; i++) printf("    "); // Indentation for current level
-    if (node->type == INTEGER) {
-        printf("%d\n", node->value); // Print integer value
-    } else {
-        printf("%c\n", node->type == PLUS ? '+' : node->type == SUBS ? '-' : node->type == PRODUCT ? '*' : '/'); // Print operator
+
+    // Print right subtree
+    if (node->right) {
+        print_ast(node->right, indent + 4, 0);
     }
-    print_ast(node->right, level + 1); // Print right subtree
+
+    // Print current node
+    if (indent) {
+        printf("%*s", indent, " ");
+    }
+    if (is_left) {
+        printf(" /");
+    } else {
+        printf(" \\");
+    }
+    if (node->type == INTEGER) {
+        printf("%d\n", node->value);
+    } else {
+        printf("%c\n", node->type == PLUS ? '+' : node->type == SUBS ? '-' : node->type == PRODUCT ? '*' : '/');
+    }
+
+    // Print left subtree
+    if (node->left) {
+        print_ast(node->left, indent + 4, 1);
+    }
 }
 
 int evaluate_ast(t_ast *node) {
@@ -225,7 +242,7 @@ int main(int argc, char **argv) {
         }
 
         printf("AST:\n");
-        print_ast(ast, 0);
+        print_ast(ast, 0, 0);
 
         int result = evaluate_ast(ast);
         printf(" = %d\n", result);
